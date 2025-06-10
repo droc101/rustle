@@ -1,5 +1,7 @@
 use getch_rs::{Getch, Key};
 use std::collections::HashMap;
+use std::fs::read_to_string;
+use rand::{thread_rng, Rng};
 
 /// The color for a letter that has not yet been checked
 const COLOR_UNSET: usize = 0;
@@ -9,11 +11,13 @@ const COLOR_GRAY: usize = 1;
 const COLOR_YELLOW: usize = 2;
 // The color for a letter that is in the word at that position
 const COLOR_GREEN: usize = 3;
+// The color used for a letter that you're typing but was already marked as gray
+const COLOR_RED: usize = 4;
 
 /// The length of the word / width of the board
 const WORD_LENGTH: usize = 5;
 /// The number of allowed guesses / height of the board
-const MAX_GUESSES: usize = 5;
+const MAX_GUESSES: usize = 6;
 
 static LOWERCASE: &str = "qwertyuiopasdfghjklzxcvbnm";
 
@@ -26,8 +30,8 @@ fn draw_board_separator(row: usize) {
     } else {
         print!("╠");
     }
-    for col in 0..(WORD_LENGTH * 2 - 1) {
-        if col & 1 != 0 {
+    for col in 0..(WORD_LENGTH * 4 - 1) {
+        if col % 4 == 3 {
             if row == 0 {
                 print!("╦");
             } else if row == MAX_GUESSES {
@@ -55,8 +59,9 @@ fn draw_board(
     board_colors: [[usize; WORD_LENGTH]; MAX_GUESSES],
     cur_row: usize,
     cur_col: usize,
+    grays: &mut Vec<char>
 ) {
-    const COLORS: [&str; 4] = ["\x1b[0m", "\x1b[37;40m", "\x1b[30;43m", "\x1b[30;42m"];
+    const COLORS: [&str; 5] = ["\x1b[0m", "\x1b[37;40m", "\x1b[30;43m", "\x1b[30;42m", "\x1b[30;41m"];
 
     print!("\x1b[H\x1b[J\x1b[H");
 
@@ -64,12 +69,16 @@ fn draw_board(
         draw_board_separator(row);
         for chr in 0..WORD_LENGTH {
             let mut c: char = board_chars[row][chr];
+            let mut color: usize = board_colors[row][chr];
+            if color == COLOR_UNSET && grays.contains(&c) {
+                color = COLOR_RED;
+            }
             if row == cur_row && chr == cur_col {
                 c = '_';
             }
             print!(
-                "\x1b[0m║\x1b[1m{}{}\x1b[0m",
-                COLORS[board_colors[row][chr]], c
+                "\x1b[0m║\x1b[1m{} {} \x1b[0m",
+                COLORS[color], c
             );
         }
         print!("║\n");
@@ -82,6 +91,7 @@ fn get_guess_status(
     guess: [char; WORD_LENGTH],
     target_slice: &str,
     output: &mut [usize; WORD_LENGTH],
+    grays: &mut Vec<char>
 ) -> bool {
     let target: String = target_slice.chars().collect();
     let lowercase_letters: String = String::from(LOWERCASE);
@@ -110,6 +120,9 @@ fn get_guess_status(
                 *yellow_count_map.get_mut(&c).unwrap() += 1;
             } else {
                 output[i] = COLOR_GRAY;
+                if !grays.contains(&c) && !target.contains(c) {
+                    grays.push(c);
+                }
             }
         }
     }
@@ -117,18 +130,26 @@ fn get_guess_status(
 }
 
 fn main() {
-    let lowercase_letters: String = String::from(LOWERCASE); // "Typo: In word 'qwertyuiopasdfghjklzxcvbnm'" SHUT UP
+    if !std::fs::exists("words.txt").expect("Failed to check if file exists") {
+        println!("words.txt not found!");
+        return;
+    }
+
     let g: Getch = Getch::new();
-    let word: String = String::from("apple");
+    let lowercase_letters: String = String::from(LOWERCASE); // "Typo: In word 'qwertyuiopasdfghjklzxcvbnm'" SHUT UP
+    let words: Vec<String> = read_to_string("words.txt").unwrap().lines().map(String::from).collect();
     let mut board_chars: [[char; WORD_LENGTH]; MAX_GUESSES] = [[' '; WORD_LENGTH]; MAX_GUESSES];
     let mut board_colors: [[usize; WORD_LENGTH]; MAX_GUESSES] =
         [[COLOR_UNSET; WORD_LENGTH]; MAX_GUESSES];
     let mut cur_x: usize = 0;
     let mut guess: usize = 0;
+    let mut grays: Vec<char> = Vec::new();
+    let word_index: usize = thread_rng().gen_range(0..words.len());
+    let word: String = words[word_index].clone();
 
     print!("\x1b[?25l"); // Steal cursor
 
-    draw_board(board_chars, board_colors, guess, cur_x);
+    draw_board(board_chars, board_colors, guess, cur_x, &mut grays);
 
     loop {
         match g.getch() {
@@ -142,22 +163,26 @@ fn main() {
             Ok(Key::Char('\r')) => {
                 // enter key
                 if cur_x == WORD_LENGTH {
-                    let winner: bool = get_guess_status(
-                        board_chars[guess],
-                        word.as_str(),
-                        &mut board_colors[guess],
-                    );
-                    if winner {
-                        draw_board(board_chars, board_colors, guess, cur_x);
-                        println!("you're winner");
-                        break;
-                    } else if guess == MAX_GUESSES - 1 {
-                        draw_board(board_chars, board_colors, guess, cur_x);
-                        println!("you're LOSER");
-                        break;
+                    let guess_str: String = String::from_iter(board_chars[guess].iter());
+                    if words.contains(&guess_str) {
+                        let winner: bool = get_guess_status(
+                            board_chars[guess],
+                            word.as_str(),
+                            &mut board_colors[guess],
+                            &mut grays
+                        );
+                        if winner {
+                            draw_board(board_chars, board_colors, guess, cur_x, &mut grays);
+                            println!("you're winner");
+                            break;
+                        } else if guess == MAX_GUESSES - 1 {
+                            draw_board(board_chars, board_colors, guess, cur_x, &mut grays);
+                            println!("you're LOSER!\nthe word was \"{}\"", word);
+                            break;
+                        }
+                        guess += 1;
+                        cur_x = 0;
                     }
-                    guess += 1;
-                    cur_x = 0;
                 }
             }
             Ok(key) => {
@@ -178,7 +203,7 @@ fn main() {
             }
             Err(e) => println!("{:?}", e),
         }
-        draw_board(board_chars, board_colors, guess, cur_x);
+        draw_board(board_chars, board_colors, guess, cur_x, &mut grays);
     }
 
     print!("\x1b[?25h"); // Return the cursor to the user
