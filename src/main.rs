@@ -109,15 +109,11 @@ fn update_board(
     }
 }
 
-fn update_keyboard_row(
-    letter_states: HashMap<char, usize>,
-    keyboard_row: Box,
-    chars: &str,
-) {
+fn update_keyboard_row(letter_states: HashMap<char, usize>, keyboard_row: Box, chars: &str) {
     let mut child = keyboard_row.first_child().expect("Keyboard key missing!");
 
     for c in chars.chars() {
-        if let Ok(l) = child.clone().downcast::<gtk4::Label>() {
+        if let Ok(l) = child.clone().downcast::<Label>() {
             if let Some(color) = letter_states.get(&c) {
                 l.remove_css_class("green");
                 l.remove_css_class("yellow");
@@ -186,8 +182,7 @@ fn main() -> glib::ExitCode {
         );
 
         let settings = gtk::Settings::default().unwrap();
-        let dark_mode = settings.is_gtk_application_prefer_dark_theme();
-        if (dark_mode) {
+        if settings.is_gtk_application_prefer_dark_theme() {
             let dark_provider = CssProvider::new();
             dark_provider.load_from_string(include_str!("style.dark.css"));
             gtk::style_context_add_provider_for_display(
@@ -304,7 +299,6 @@ fn main() -> glib::ExitCode {
         let board_colors: Rc<RefCell<[[usize; WORD_LENGTH]; MAX_GUESSES]>> =
             Rc::new(RefCell::new(board_colors));
         let guess: Rc<RefCell<usize>> = Rc::new(RefCell::new(guess)); // assuming guess is Copy or Clone
-        
 
         let k: EventControllerKey = EventControllerKey::builder().build();
         k.connect_key_pressed(move |_, k: Key, _, _| {
@@ -363,6 +357,7 @@ fn main() -> glib::ExitCode {
                                 keyboard_row_2_val.clone(),
                                 keyboard_row_3_val.clone(),
                             );
+                            println!("You win!");
                             return Propagation::Stop;
                         } else if *guess_val == MAX_GUESSES - 1 {
                             // TODO: fail
@@ -379,6 +374,7 @@ fn main() -> glib::ExitCode {
                                 keyboard_row_2_val.clone(),
                                 keyboard_row_3_val.clone(),
                             );
+                            println!("You lose! The answer was \"{}\"", answer);
                             return Propagation::Stop;
                         }
                         *guess_val += 1;
