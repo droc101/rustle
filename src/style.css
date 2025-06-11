@@ -1,0 +1,38 @@
+.title {
+    font-weight: bold;
+    text-decoration: underline;
+    font-size: 24pt;
+}
+
+.tile {
+    border: 1px solid #5558;
+    border-radius: 8px;
+    font-size: 24pt;
+    font-weight: bold;
+    color: white;
+}
+
+.cursor {
+    border: 1px solid #fff8;
+}
+
+.green {
+    background: green;
+}
+
+.yellow {
+    background: yellow;
+    color: black;
+}
+
+.gray {
+    background: gray;
+}
+
+.key {
+    border: 1px solid #5558;
+    border-radius: 8px;
+    font-size: 14pt;
+    font-weight: bold;
+    color: white;
+}

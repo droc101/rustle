@@ -1,7 +1,15 @@
-use getch_rs::{Getch, Key};
+use gtk::prelude::*;
+use gtk::{glib, Application, ApplicationWindow};
+use gtk4 as gtk;
+use gtk4::gdk::Key;
+use gtk4::glib::Propagation;
+use gtk4::Orientation::{Horizontal, Vertical};
+use gtk4::{gdk, Align, Box, CssProvider, EventControllerKey, Grid, Label, Widget};
+use rand::{thread_rng, Rng};
+use std::cell::{Ref, RefCell, RefMut};
 use std::collections::HashMap;
 use std::fs::read_to_string;
-use rand::{thread_rng, Rng};
+use std::rc::Rc;
 
 /// The color for a letter that has not yet been checked
 const COLOR_UNSET: usize = 0;
@@ -11,87 +19,23 @@ const COLOR_GRAY: usize = 1;
 const COLOR_YELLOW: usize = 2;
 // The color for a letter that is in the word at that position
 const COLOR_GREEN: usize = 3;
-// The color used for a letter that you're typing but was already marked as gray
-const COLOR_RED: usize = 4;
 
 /// The length of the word / width of the board
 const WORD_LENGTH: usize = 5;
 /// The number of allowed guesses / height of the board
 const MAX_GUESSES: usize = 6;
 
-static LOWERCASE: &str = "qwertyuiopasdfghjklzxcvbnm";
-
-/// Draws a row separator for the board
-fn draw_board_separator(row: usize) {
-    if row == 0 {
-        print!("╔");
-    } else if row == MAX_GUESSES {
-        print!("╚");
-    } else {
-        print!("╠");
-    }
-    for col in 0..(WORD_LENGTH * 4 - 1) {
-        if col % 4 == 3 {
-            if row == 0 {
-                print!("╦");
-            } else if row == MAX_GUESSES {
-                print!("╩");
-            } else {
-                print!("╬");
-            }
-        } else {
-            print!("═");
-        }
-    }
-    if row == 0 {
-        print!("╗");
-    } else if row == MAX_GUESSES {
-        print!("╝");
-    } else {
-        print!("╣");
-    }
-    print!("\n");
-}
-
-/// Draw the board
-fn draw_board(
-    board_chars: [[char; WORD_LENGTH]; MAX_GUESSES],
-    board_colors: [[usize; WORD_LENGTH]; MAX_GUESSES],
-    cur_row: usize,
-    cur_col: usize,
-    grays: &mut Vec<char>
-) {
-    const COLORS: [&str; 5] = ["\x1b[0m", "\x1b[37;40m", "\x1b[30;43m", "\x1b[30;42m", "\x1b[30;41m"];
-
-    print!("\x1b[H\x1b[J\x1b[H");
-
-    for row in 0..MAX_GUESSES {
-        draw_board_separator(row);
-        for chr in 0..WORD_LENGTH {
-            let mut c: char = board_chars[row][chr];
-            let mut color: usize = board_colors[row][chr];
-            if color == COLOR_UNSET && grays.contains(&c) {
-                color = COLOR_RED;
-            }
-            if row == cur_row && chr == cur_col {
-                c = '_';
-            }
-            print!(
-                "\x1b[0m║\x1b[1m{} {} \x1b[0m",
-                COLORS[color], c
-            );
-        }
-        print!("║\n");
-    }
-    draw_board_separator(MAX_GUESSES);
-}
+const LOWERCASE: &str = "qwertyuiopasdfghjklzxcvbnm"; // "Typo: In word 'qwertyuiopasdfghjklzxcvbnm'" SHUT UP
+const KEYBOARD_ROW1: &str = "qwertyuiop";
+const KEYBOARD_ROW2: &str = "asdfghjkl";
+const KEYBOARD_ROW3: &str = "zxcvbnm";
 
 /// Check a guess
 fn get_guess_status(
     guess: [char; WORD_LENGTH],
     target_slice: &str,
     output: &mut [usize; WORD_LENGTH],
-    grays: &mut Vec<char>
+    // grays: &mut Vec<char>
 ) -> bool {
     let target: String = target_slice.chars().collect();
     let lowercase_letters: String = String::from(LOWERCASE);
@@ -120,91 +64,265 @@ fn get_guess_status(
                 *yellow_count_map.get_mut(&c).unwrap() += 1;
             } else {
                 output[i] = COLOR_GRAY;
-                if !grays.contains(&c) && !target.contains(c) {
-                    grays.push(c);
-                }
+                // if !grays.contains(&c) && !target.contains(c) {
+                //     grays.push(c);
+                // }
             }
         }
     }
     return wins == WORD_LENGTH;
 }
 
-fn main() {
+fn update_board(
+    board_chars: [[char; WORD_LENGTH]; MAX_GUESSES],
+    board_colors: [[usize; WORD_LENGTH]; MAX_GUESSES],
+    cur_row: usize,
+    cur_col: usize,
+    grid_ref: Ref<Grid>,
+) {
+    for row in 0..MAX_GUESSES {
+        for chr in 0..WORD_LENGTH {
+            let mut c: char = board_chars[row][chr];
+            let color: usize = board_colors[row][chr];
+            let w: Widget = (*grid_ref).child_at(chr as i32, row as i32).unwrap();
+            let l: Label = w.downcast::<Label>().ok().unwrap();
+            l.remove_css_class("green");
+            l.remove_css_class("yellow");
+            l.remove_css_class("gray");
+            l.remove_css_class("cursor");
+            if color == COLOR_GREEN {
+                l.add_css_class("green");
+            } else if color == COLOR_YELLOW {
+                l.add_css_class("yellow");
+            } else if color == COLOR_GRAY {
+                l.add_css_class("gray");
+            } else if row == cur_row && chr == cur_col {
+                l.add_css_class("cursor");
+                c = '_';
+            }
+            l.set_text(&*c.to_string().to_uppercase());
+        }
+    }
+}
+
+fn build_keyboard_row(keys: &str) -> Box {
+    let keyboard_row: Box = Box::new(Horizontal, 4);
+    keyboard_row.set_halign(Align::Center);
+    for c in keys.chars() {
+        let key: Label = Label::builder().build();
+        key.set_text(&*c.to_uppercase().to_string());
+        key.set_size_request(40, 60);
+        key.add_css_class("key");
+        keyboard_row.append(&key);
+    }
+    return keyboard_row;
+}
+
+fn main() -> glib::ExitCode {
     if !std::fs::exists("words.txt").expect("Failed to check if file exists") {
         println!("words.txt not found!");
-        return;
+        return glib::ExitCode::FAILURE;
     }
 
-    let g: Getch = Getch::new();
-    let lowercase_letters: String = String::from(LOWERCASE); // "Typo: In word 'qwertyuiopasdfghjklzxcvbnm'" SHUT UP
-    let words: Vec<String> = read_to_string("words.txt").unwrap().lines().map(String::from).collect();
-    let mut board_chars: [[char; WORD_LENGTH]; MAX_GUESSES] = [[' '; WORD_LENGTH]; MAX_GUESSES];
-    let mut board_colors: [[usize; WORD_LENGTH]; MAX_GUESSES] =
-        [[COLOR_UNSET; WORD_LENGTH]; MAX_GUESSES];
-    let mut cur_x: usize = 0;
-    let mut guess: usize = 0;
-    let mut grays: Vec<char> = Vec::new();
-    let word_index: usize = thread_rng().gen_range(0..words.len());
-    let word: String = words[word_index].clone();
+    let app: Application = Application::builder()
+        .application_id("dev.droc101.rustle")
+        .build();
 
-    print!("\x1b[?25l"); // Steal cursor
+    app.connect_startup(|_app| {
+        let provider: CssProvider = CssProvider::new();
+        provider.load_from_string(include_str!("style.css"));
 
-    draw_board(board_chars, board_colors, guess, cur_x, &mut grays);
+        gtk::style_context_add_provider_for_display(
+            &gdk::Display::default().expect("Could not connect to a display."),
+            &provider,
+            gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
+        );
+    });
 
-    loop {
-        match g.getch() {
-            Ok(Key::Ctrl('c')) => break,
-            Ok(Key::Delete) => {
-                if cur_x != 0 {
-                    board_chars[guess][cur_x - 1] = ' ';
-                    cur_x -= 1;
-                }
+    app.connect_activate(|app| {
+        let lowercase_letters: String = String::from(LOWERCASE);
+        let words: Vec<String> = read_to_string("words.txt")
+            .unwrap()
+            .lines()
+            .map(String::from)
+            .collect();
+        let answers: Vec<String> = read_to_string("answers.txt")
+            .unwrap()
+            .lines()
+            .map(String::from)
+            .collect();
+        let board_chars: [[char; WORD_LENGTH]; MAX_GUESSES] = [[' '; WORD_LENGTH]; MAX_GUESSES];
+        let board_colors: [[usize; WORD_LENGTH]; MAX_GUESSES] =
+            [[COLOR_UNSET; WORD_LENGTH]; MAX_GUESSES];
+        let cur_x: usize = 0;
+        let guess: usize = 0;
+        let answer_index: usize = thread_rng().gen_range(0..answers.len());
+        let answer: String = words[answer_index].clone();
+
+        let window: ApplicationWindow = ApplicationWindow::builder()
+            .application(app)
+            .default_width(800)
+            .default_height(750)
+            .title("Rustle!")
+            .resizable(false)
+            .build();
+
+        let outer_box: Box = Box::new(Horizontal, 6);
+        outer_box.set_halign(Align::Center);
+
+        let main_box: Box = Box::new(Vertical, 6);
+        main_box.set_vexpand(true);
+        main_box.set_margin_top(10);
+
+        let title: Label = Label::builder().build();
+        title.set_text("Rustle!");
+        title.add_css_class("title");
+        title.set_margin_bottom(10);
+        main_box.append(&title);
+
+        let grid_box: Box = Box::new(Horizontal, 6);
+        grid_box.set_halign(Align::Center);
+
+        let grid: Grid = Grid::builder().build();
+        grid.set_column_homogeneous(true);
+        grid.set_row_homogeneous(true);
+        grid.set_column_spacing(4);
+        grid.set_row_spacing(4);
+        grid.set_hexpand(false);
+        for _ in 0..MAX_GUESSES {
+            grid.insert_row(0);
+            for _ in 0..WORD_LENGTH {
+                grid.insert_column(0);
             }
-            Ok(Key::Char('\r')) => {
-                // enter key
-                if cur_x == WORD_LENGTH {
-                    let guess_str: String = String::from_iter(board_chars[guess].iter());
+        }
+        for y in 0i32..MAX_GUESSES as i32 {
+            for x in 0i32..WORD_LENGTH as i32 {
+                let label: Label = Label::builder().build();
+                label.set_size_request(60, 60);
+                label.add_css_class("tile");
+                label.set_text("");
+                grid.attach(&label, x, y, 1, 1);
+            }
+        }
+        grid_box.append(&grid);
+        main_box.append(&grid_box);
+
+        // let keyboard_row_1: Box = build_keyboard_row(KEYBOARD_ROW1);
+        // keyboard_row_1.set_margin_top(50);
+        // main_box.append(&keyboard_row_1);
+        // 
+        // let keyboard_row_2: Box = build_keyboard_row(KEYBOARD_ROW2);
+        // main_box.append(&keyboard_row_2);
+        // 
+        // let keyboard_row_3: Box = build_keyboard_row(KEYBOARD_ROW3);
+        // main_box.append(&keyboard_row_3);
+
+        outer_box.append(&main_box);
+        window.set_child(Some(&outer_box));
+
+        let grid: Rc<RefCell<Grid>> = Rc::new(RefCell::new(grid));
+
+        update_board(board_chars, board_colors, guess, cur_x, grid.borrow());
+
+        let cur_x: Rc<RefCell<usize>> = Rc::new(RefCell::new(cur_x));
+        let board_chars: Rc<RefCell<[[char; WORD_LENGTH]; MAX_GUESSES]>> =
+            Rc::new(RefCell::new(board_chars));
+        let board_colors: Rc<RefCell<[[usize; WORD_LENGTH]; MAX_GUESSES]>> =
+            Rc::new(RefCell::new(board_colors));
+        let guess: Rc<RefCell<usize>> = Rc::new(RefCell::new(guess)); // assuming guess is Copy or Clone
+
+        let k: EventControllerKey = EventControllerKey::builder().build();
+        k.connect_key_pressed(move |_, k: Key, _, _| {
+            let mut cur_x_val: RefMut<usize> = cur_x.borrow_mut();
+            let mut board_chars_val: RefMut<[[char; WORD_LENGTH]; MAX_GUESSES]> =
+                board_chars.borrow_mut();
+            let mut board_colors_val: RefMut<[[usize; WORD_LENGTH]; MAX_GUESSES]> =
+                board_colors.borrow_mut();
+            let grid_val: Ref<Grid> = grid.borrow();
+            let mut guess_val: RefMut<usize> = guess.borrow_mut();
+            if k == Key::BackSpace {
+                if *cur_x_val != 0 {
+                    board_chars_val[*guess_val][*cur_x_val - 1] = ' ';
+                    *cur_x_val -= 1;
+                }
+                update_board(
+                    *board_chars_val,
+                    *board_colors_val,
+                    *guess_val,
+                    *cur_x_val,
+                    grid_val,
+                );
+                return Propagation::Stop;
+            } else if k == Key::Return || k == Key::KP_Enter {
+                if *cur_x_val == WORD_LENGTH {
+                    let guess_str: String = String::from_iter(board_chars_val[*guess_val].iter());
                     if words.contains(&guess_str) {
                         let winner: bool = get_guess_status(
-                            board_chars[guess],
-                            word.as_str(),
-                            &mut board_colors[guess],
-                            &mut grays
+                            board_chars_val[*guess_val],
+                            answer.as_str(),
+                            &mut board_colors_val[*guess_val],
                         );
                         if winner {
-                            draw_board(board_chars, board_colors, guess, cur_x, &mut grays);
-                            println!("you're winner");
-                            break;
-                        } else if guess == MAX_GUESSES - 1 {
-                            draw_board(board_chars, board_colors, guess, cur_x, &mut grays);
-                            println!("you're LOSER!\nthe word was \"{}\"", word);
-                            break;
+                            // TODO: win
+                            update_board(
+                                *board_chars_val,
+                                *board_colors_val,
+                                *guess_val,
+                                *cur_x_val,
+                                grid_val,
+                            );
+                            return Propagation::Stop;
+                        } else if *guess_val == MAX_GUESSES - 1 {
+                            // TODO: fail
+                            update_board(
+                                *board_chars_val,
+                                *board_colors_val,
+                                *guess_val,
+                                *cur_x_val,
+                                grid_val,
+                            );
+                            return Propagation::Stop;
                         }
-                        guess += 1;
-                        cur_x = 0;
+                        *guess_val += 1;
+                        *cur_x_val = 0;
+                        update_board(
+                            *board_chars_val,
+                            *board_colors_val,
+                            *guess_val,
+                            *cur_x_val,
+                            grid_val,
+                        );
                     }
                 }
-            }
-            Ok(key) => {
-                if cur_x + 1 <= WORD_LENGTH {
+                return Propagation::Stop;
+            } else {
+                if *cur_x_val + 1 <= WORD_LENGTH {
                     // Is this a crime? Yeah, probably. Am I going to fix it? Probably not.
-                    let mut chr = format!("{:?}", key);
-                    if chr.contains("Char('") {
-                        chr = chr.replace("Char('", "");
-                        chr = chr.replace("')", "");
-                        chr = chr.to_ascii_lowercase();
-
+                    let unicode: Option<char> = k.to_unicode();
+                    if unicode.is_some() {
+                        let mut chr: String = String::from(unicode.unwrap());
+                        chr = chr.to_lowercase();
                         if chr.len() == 1 && lowercase_letters.contains(chr.as_str()) {
-                            board_chars[guess][cur_x] = chr.pop().unwrap();
-                            cur_x += 1; // @rust you stupid language add ++ operator
+                            board_chars_val[*guess_val][*cur_x_val] = chr.pop().unwrap();
+                            *cur_x_val += 1; // @rust you stupid language add ++ operator
+                            update_board(
+                                *board_chars_val,
+                                *board_colors_val,
+                                *guess_val,
+                                *cur_x_val,
+                                grid_val,
+                            );
+                            return Propagation::Stop;
                         }
                     }
                 }
             }
-            Err(e) => println!("{:?}", e),
-        }
-        draw_board(board_chars, board_colors, guess, cur_x, &mut grays);
-    }
+            return Propagation::Proceed;
+        });
+        window.add_controller(k);
 
-    print!("\x1b[?25h"); // Return the cursor to the user
+        window.present();
+    });
+
+    return app.run();
 }

@@ -4,5 +4,5 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-getch-rs = "0.2"
 rand = "0.8.4"
+gtk4 = { version = "0.9.6", features = ["v4_12"] }
