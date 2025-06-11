@@ -7,7 +7,7 @@ use gtk4::Orientation::{Horizontal, Vertical};
 use gtk4::{
     gdk, AlertDialog, Align, Box, CssProvider, EventControllerKey, Grid, Label, LinkButton, Widget,
 };
-use rand::{thread_rng, Rng};
+use rand::{rng, Rng};
 use std::cell::{Ref, RefCell, RefMut};
 use std::collections::HashMap;
 use std::fs::read_to_string;
@@ -222,7 +222,7 @@ fn main() -> glib::ExitCode {
         let mut letter_states: HashMap<char, usize> = HashMap::new();
         let cur_x: usize = 0;
         let guess: usize = 0;
-        let answer_index: usize = thread_rng().gen_range(0..answers.len());
+        let answer_index: usize = rng().random_range(0..answers.len());
         let answer: String = answers[answer_index].clone();
         let locked: bool = false;
 
@@ -387,7 +387,7 @@ fn main() -> glib::ExitCode {
             *cur_x_val = 0;
             *guess_val = 0;
 
-            *answer_index_val = thread_rng().gen_range(0..answers_val.len());
+            *answer_index_val = rng().random_range(0..answers_val.len());
             *answer_val = answers_val[*answer_index_val].clone();
 
             return Propagation::Stop;
