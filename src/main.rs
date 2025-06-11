@@ -4,7 +4,7 @@ use gtk4 as gtk;
 use gtk4::gdk::Key;
 use gtk4::glib::Propagation;
 use gtk4::Orientation::{Horizontal, Vertical};
-use gtk4::{gdk, Align, Box, CssProvider, EventControllerKey, Grid, Label, Widget};
+use gtk4::{gdk, AlertDialog, Align, Box, CssProvider, EventControllerKey, Grid, Label, Widget};
 use rand::{thread_rng, Rng};
 use std::cell::{Ref, RefCell, RefMut};
 use std::collections::HashMap;
@@ -213,6 +213,7 @@ fn main() -> glib::ExitCode {
         let guess: usize = 0;
         let answer_index: usize = thread_rng().gen_range(0..answers.len());
         let answer: String = words[answer_index].clone();
+        let locked: bool = false;
 
         for c in LOWERCASE.chars() {
             letter_states.insert(c, COLOR_UNSET);
@@ -284,21 +285,17 @@ fn main() -> glib::ExitCode {
         let keyboard_row_2: Rc<RefCell<Box>> = Rc::new(RefCell::new(keyboard_row_2));
         let keyboard_row_3: Rc<RefCell<Box>> = Rc::new(RefCell::new(keyboard_row_3));
         let letter_states: Rc<RefCell<HashMap<char, usize>>> = Rc::new(RefCell::new(letter_states));
+        let window_rc: Rc<RefCell<ApplicationWindow>> = Rc::new(RefCell::new(window.clone()));
 
         update_board(board_chars, board_colors, guess, cur_x, grid.borrow());
-        // update_keyboard(
-        //     letter_states.borrow(),
-        //     *keyboard_row_1.borrow(),
-        //     keyboard_row_2,
-        //     keyboard_row_3,
-        // );
 
         let cur_x: Rc<RefCell<usize>> = Rc::new(RefCell::new(cur_x));
         let board_chars: Rc<RefCell<[[char; WORD_LENGTH]; MAX_GUESSES]>> =
             Rc::new(RefCell::new(board_chars));
         let board_colors: Rc<RefCell<[[usize; WORD_LENGTH]; MAX_GUESSES]>> =
             Rc::new(RefCell::new(board_colors));
-        let guess: Rc<RefCell<usize>> = Rc::new(RefCell::new(guess)); // assuming guess is Copy or Clone
+        let guess: Rc<RefCell<usize>> = Rc::new(RefCell::new(guess));
+        let locked: Rc<RefCell<bool>> = Rc::new(RefCell::new(locked));
 
         let k: EventControllerKey = EventControllerKey::builder().build();
         k.connect_key_pressed(move |_, k: Key, _, _| {
@@ -311,8 +308,15 @@ fn main() -> glib::ExitCode {
             let keyboard_row_1_val = keyboard_row_1.borrow();
             let keyboard_row_2_val = keyboard_row_2.borrow();
             let keyboard_row_3_val = keyboard_row_3.borrow();
+            let window_val = window_rc.borrow();
             let mut guess_val: RefMut<usize> = guess.borrow_mut();
             let mut letter_states_val: RefMut<HashMap<char, usize>> = letter_states.borrow_mut();
+            let mut locked_val: RefMut<bool> = locked.borrow_mut();
+
+            if *locked_val {
+                return Propagation::Proceed;
+            }
+
             if k == Key::BackSpace {
                 if *cur_x_val != 0 {
                     board_chars_val[*guess_val][*cur_x_val - 1] = ' ';
@@ -357,7 +361,11 @@ fn main() -> glib::ExitCode {
                                 keyboard_row_2_val.clone(),
                                 keyboard_row_3_val.clone(),
                             );
-                            println!("You win!");
+                            *locked_val = true;
+                            AlertDialog::builder()
+                                .detail("You Win!")
+                                .build()
+                                .show(Some(&*window_val));
                             return Propagation::Stop;
                         } else if *guess_val == MAX_GUESSES - 1 {
                             // TODO: fail
@@ -374,7 +382,13 @@ fn main() -> glib::ExitCode {
                                 keyboard_row_2_val.clone(),
                                 keyboard_row_3_val.clone(),
                             );
-                            println!("You lose! The answer was \"{}\"", answer);
+                            let message = format!("The word was \"{}\"", answer);
+                            AlertDialog::builder()
+                                .detail(message)
+                                .message("You Lose!")
+                                .build()
+                                .show(Some(&*window_val));
+                            *locked_val = true;
                             return Propagation::Stop;
                         }
                         *guess_val += 1;
