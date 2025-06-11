@@ -4,8 +4,7 @@ use gtk4::gdk::Key;
 use gtk4::glib::{ExitCode, Propagation};
 use gtk4::Orientation::{Horizontal, Vertical};
 use gtk4::{
-    gdk, AlertDialog, Align, Box, CssProvider, EventControllerKey,
-    Grid, Label, LinkButton, Widget,
+    gdk, AlertDialog, Align, Box, Button, CssProvider, EventControllerKey, Grid, Label, Widget,
 };
 use libadwaita::prelude::{AdwApplicationWindowExt, BinExt};
 use libadwaita::{
@@ -290,7 +289,7 @@ fn main() -> ExitCode {
         main_box.append(&grid_box);
 
         let focusable_box = Bin::builder().build();
-        focusable_box.set_margin_top(50);
+        focusable_box.set_margin_top(40);
         focusable_box.set_widget_name("keyboard");
         main_box.append(&focusable_box);
 
@@ -307,20 +306,24 @@ fn main() -> ExitCode {
 
         focusable_box.set_child(Some(&kb_box));
 
-        let new_game: LinkButton = LinkButton::builder().label("Play Again").build();
+        let new_game: Button = Button::builder().label("Play Again").build();
         new_game.add_css_class("new_game");
         new_game.set_visible(false);
+        new_game.set_size_request(200, -1);
+        new_game.set_hexpand(false);
+        main_box.set_homogeneous(false);
         main_box.append(&new_game);
 
         let toast_overlay: ToastOverlay = ToastOverlay::new();
         toast_overlay.set_child(Some(&outermost_box));
 
-        outermost_box.append(&main_box);
+        outer_box.append(&main_box);
+        outermost_box.append(&outer_box);
         window.set_content(Some(&toast_overlay));
 
         //#region refcells
         let grid_rc: Rc<RefCell<Grid>> = Rc::new(RefCell::new(grid.clone()));
-        let new_game_rc: Rc<RefCell<LinkButton>> = Rc::new(RefCell::new(new_game.clone()));
+        let new_game_rc: Rc<RefCell<Button>> = Rc::new(RefCell::new(new_game.clone()));
         let keyboard_row_1_rc: Rc<RefCell<Box>> = Rc::new(RefCell::new(keyboard_row_1.clone()));
         let keyboard_row_2_rc: Rc<RefCell<Box>> = Rc::new(RefCell::new(keyboard_row_2.clone()));
         let keyboard_row_3_rc: Rc<RefCell<Box>> = Rc::new(RefCell::new(keyboard_row_3.clone()));
@@ -339,7 +342,7 @@ fn main() -> ExitCode {
         let toast_overlay_rc: Rc<RefCell<ToastOverlay>> = Rc::new(RefCell::new(toast_overlay));
 
         let grid_rc_2: Rc<RefCell<Grid>> = grid_rc.clone();
-        let new_game_rc_2: Rc<RefCell<LinkButton>> = new_game_rc.clone();
+        let new_game_rc_2: Rc<RefCell<Button>> = new_game_rc.clone();
         let keyboard_row_1_rc_2: Rc<RefCell<Box>> = keyboard_row_1_rc.clone();
         let keyboard_row_2_rc_2: Rc<RefCell<Box>> = keyboard_row_2_rc.clone();
         let keyboard_row_3_rc_2: Rc<RefCell<Box>> = keyboard_row_3_rc.clone();
@@ -360,8 +363,8 @@ fn main() -> ExitCode {
 
         update_board(board_chars, board_colors, guess, cur_x, grid_rc.borrow());
 
-        new_game.connect_activate_link(move |_| {
-            let new_game_val: Ref<LinkButton> = new_game_rc_2.borrow();
+        new_game.connect_clicked(move |_| {
+            let new_game_val: Ref<Button> = new_game_rc_2.borrow();
             let mut locked_val: RefMut<bool> = locked_rc_2.borrow_mut();
             let mut cur_x_val: RefMut<usize> = cur_x_rc_2.borrow_mut();
             let mut board_chars_val: RefMut<[[char; WORD_LENGTH]; MAX_GUESSES]> =
@@ -412,8 +415,6 @@ fn main() -> ExitCode {
 
             *answer_index_val = rng().random_range(0..answers_val.len());
             *answer_val = answers_val[*answer_index_val].clone();
-
-            return Propagation::Stop;
         });
 
         let k: EventControllerKey = EventControllerKey::builder().build();
@@ -424,7 +425,7 @@ fn main() -> ExitCode {
             let mut board_colors_val: RefMut<[[usize; WORD_LENGTH]; MAX_GUESSES]> =
                 board_colors_rc.borrow_mut();
             let grid_val: Ref<Grid> = grid_rc.borrow();
-            let new_game_val: Ref<LinkButton> = new_game_rc.borrow();
+            let new_game_val: Ref<Button> = new_game_rc.borrow();
             let keyboard_row_1_val: Ref<Box> = keyboard_row_1_rc.borrow();
             let keyboard_row_2_val: Ref<Box> = keyboard_row_2_rc.borrow();
             let keyboard_row_3_val: Ref<Box> = keyboard_row_3_rc.borrow();

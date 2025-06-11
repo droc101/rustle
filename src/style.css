@@ -45,8 +45,6 @@
     background: var(--card-bg-color);
     border: 1px solid #5552;
     box-sizing: border-box;
-    border-radius: 0;
+    border-radius: 8px;
     padding: 8px;
-    border-left: none;
-    border-right: none;
 }
