@@ -1,0 +1,24 @@
+.tile {
+    color: white;
+}
+
+.key {
+    color: white;
+}
+
+.cursor {
+    border: 1px solid #fff8;
+}
+
+.green {
+    background: green;
+}
+
+.yellow {
+    background: yellow;
+    color: black;
+}
+
+.gray {
+    background: gray;
+}

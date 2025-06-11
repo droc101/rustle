@@ -9,7 +9,7 @@
     border-radius: 8px;
     font-size: 24pt;
     font-weight: bold;
-    color: white;
+    color: black;
 }
 
 .key {
@@ -17,23 +17,22 @@
     border-radius: 8px;
     font-size: 14pt;
     font-weight: bold;
-    color: white;
+    color: black;
     border-bottom-width: 4px;
 }
 
 .cursor {
-    border: 1px solid #fff8;
+    border: 1px solid #0008;
 }
 
 .green {
-    background: green;
+    background: lightgreen;
 }
 
 .yellow {
-    background: yellow;
-    color: black;
+    background: gold;
 }
 
 .gray {
-    background: gray;
+    background: silver;
 }

@@ -63,10 +63,12 @@ fn get_guess_status(
             if green_count_map[&c] + yellow_count_map[&c] < total_count_map[&c] {
                 output[i] = COLOR_YELLOW;
                 *yellow_count_map.get_mut(&c).unwrap() += 1;
-                letter_states.insert(c, COLOR_YELLOW);
+                if letter_states[&c] < COLOR_YELLOW {
+                    letter_states.insert(c, COLOR_YELLOW);
+                }
             } else {
                 output[i] = COLOR_GRAY;
-                if !target.contains(c) {
+                if !target.contains(c) && letter_states[&c] < COLOR_GRAY {
                     letter_states.insert(c, COLOR_GRAY);
                 }
             }
@@ -182,6 +184,18 @@ fn main() -> glib::ExitCode {
             &provider,
             gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
         );
+
+        let settings = gtk::Settings::default().unwrap();
+        let dark_mode = settings.is_gtk_application_prefer_dark_theme();
+        if (dark_mode) {
+            let dark_provider = CssProvider::new();
+            dark_provider.load_from_string(include_str!("style.dark.css"));
+            gtk::style_context_add_provider_for_display(
+                &gdk::Display::default().expect("Could not connect to a display."),
+                &dark_provider,
+                gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
+            );
+        }
     });
 
     app.connect_activate(|app| {
