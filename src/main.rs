@@ -4,7 +4,9 @@ use gtk4 as gtk;
 use gtk4::gdk::Key;
 use gtk4::glib::Propagation;
 use gtk4::Orientation::{Horizontal, Vertical};
-use gtk4::{gdk, AlertDialog, Align, Box, CssProvider, EventControllerKey, Grid, Label, Widget};
+use gtk4::{
+    gdk, AlertDialog, Align, Box, CssProvider, EventControllerKey, Grid, Label, LinkButton, Widget,
+};
 use rand::{thread_rng, Rng};
 use std::cell::{Ref, RefCell, RefMut};
 use std::collections::HashMap;
@@ -25,9 +27,14 @@ const WORD_LENGTH: usize = 5;
 /// The number of allowed guesses / height of the board
 const MAX_GUESSES: usize = 6;
 
+/// All lowercase letters
 const LOWERCASE: &str = "qwertyuiopasdfghjklzxcvbnm"; // "Typo: In word 'qwertyuiopasdfghjklzxcvbnm'" SHUT UP
+
+/// Keys on the top row of the qwerty keyboard
 const KEYBOARD_ROW1: &str = "qwertyuiop";
+/// Keys on the middle row of the qwerty keyboard
 const KEYBOARD_ROW2: &str = "asdfghjkl";
+/// Keys on the bottom row of the qwerty keyboard
 const KEYBOARD_ROW3: &str = "zxcvbnm";
 
 /// Check a guess
@@ -77,6 +84,7 @@ fn get_guess_status(
     return wins == WORD_LENGTH;
 }
 
+/// Update the colors & letters of the board
 fn update_board(
     board_chars: [[char; WORD_LENGTH]; MAX_GUESSES],
     board_colors: [[usize; WORD_LENGTH]; MAX_GUESSES],
@@ -109,6 +117,7 @@ fn update_board(
     }
 }
 
+/// Update the colors on a row of the keyboard
 fn update_keyboard_row(letter_states: HashMap<char, usize>, keyboard_row: Box, chars: &str) {
     let mut child = keyboard_row.first_child().expect("Keyboard key missing!");
 
@@ -137,6 +146,7 @@ fn update_keyboard_row(letter_states: HashMap<char, usize>, keyboard_row: Box, c
     }
 }
 
+/// Update the colors on the keyboard
 fn update_keyboard(
     letter_states: HashMap<char, usize>,
     keyboard_row1: Box,
@@ -148,6 +158,7 @@ fn update_keyboard(
     update_keyboard_row(letter_states.clone(), keyboard_row3, KEYBOARD_ROW3);
 }
 
+/// Create a row of keys
 fn build_keyboard_row(keys: &str) -> Box {
     let keyboard_row: Box = Box::new(Horizontal, 4);
     keyboard_row.set_halign(Align::Center);
@@ -212,7 +223,7 @@ fn main() -> glib::ExitCode {
         let cur_x: usize = 0;
         let guess: usize = 0;
         let answer_index: usize = thread_rng().gen_range(0..answers.len());
-        let answer: String = words[answer_index].clone();
+        let answer: String = answers[answer_index].clone();
         let locked: bool = false;
 
         for c in LOWERCASE.chars() {
@@ -277,41 +288,128 @@ fn main() -> glib::ExitCode {
         let keyboard_row_3: Box = build_keyboard_row(KEYBOARD_ROW3);
         main_box.append(&keyboard_row_3);
 
+        let new_game: LinkButton = LinkButton::builder().label("New Game").build();
+        new_game.add_css_class("new_game");
+        new_game.set_visible(false);
+        main_box.append(&new_game);
+
         outer_box.append(&main_box);
         window.set_child(Some(&outer_box));
 
-        let grid: Rc<RefCell<Grid>> = Rc::new(RefCell::new(grid));
-        let keyboard_row_1: Rc<RefCell<Box>> = Rc::new(RefCell::new(keyboard_row_1));
-        let keyboard_row_2: Rc<RefCell<Box>> = Rc::new(RefCell::new(keyboard_row_2));
-        let keyboard_row_3: Rc<RefCell<Box>> = Rc::new(RefCell::new(keyboard_row_3));
-        let letter_states: Rc<RefCell<HashMap<char, usize>>> = Rc::new(RefCell::new(letter_states));
+        //#region refcells
+        let grid_rc: Rc<RefCell<Grid>> = Rc::new(RefCell::new(grid.clone()));
+        let new_game_rc: Rc<RefCell<LinkButton>> = Rc::new(RefCell::new(new_game.clone()));
+        let keyboard_row_1_rc: Rc<RefCell<Box>> = Rc::new(RefCell::new(keyboard_row_1.clone()));
+        let keyboard_row_2_rc: Rc<RefCell<Box>> = Rc::new(RefCell::new(keyboard_row_2.clone()));
+        let keyboard_row_3_rc: Rc<RefCell<Box>> = Rc::new(RefCell::new(keyboard_row_3.clone()));
+        let letter_states_rc: Rc<RefCell<HashMap<char, usize>>> =
+            Rc::new(RefCell::new(letter_states.clone()));
         let window_rc: Rc<RefCell<ApplicationWindow>> = Rc::new(RefCell::new(window.clone()));
-
-        update_board(board_chars, board_colors, guess, cur_x, grid.borrow());
-
-        let cur_x: Rc<RefCell<usize>> = Rc::new(RefCell::new(cur_x));
-        let board_chars: Rc<RefCell<[[char; WORD_LENGTH]; MAX_GUESSES]>> =
+        let cur_x_rc: Rc<RefCell<usize>> = Rc::new(RefCell::new(cur_x));
+        let board_chars_rc: Rc<RefCell<[[char; WORD_LENGTH]; MAX_GUESSES]>> =
             Rc::new(RefCell::new(board_chars));
-        let board_colors: Rc<RefCell<[[usize; WORD_LENGTH]; MAX_GUESSES]>> =
+        let board_colors_rc: Rc<RefCell<[[usize; WORD_LENGTH]; MAX_GUESSES]>> =
             Rc::new(RefCell::new(board_colors));
-        let guess: Rc<RefCell<usize>> = Rc::new(RefCell::new(guess));
-        let locked: Rc<RefCell<bool>> = Rc::new(RefCell::new(locked));
+        let guess_rc: Rc<RefCell<usize>> = Rc::new(RefCell::new(guess));
+        let locked_rc: Rc<RefCell<bool>> = Rc::new(RefCell::new(locked));
+        let answer_rc: Rc<RefCell<String>> = Rc::new(RefCell::new(answer));
+        let answers_rc: Rc<RefCell<Vec<String>>> = Rc::new(RefCell::new(answers));
+
+        let grid_rc_2: Rc<RefCell<Grid>> = grid_rc.clone();
+        let new_game_rc_2: Rc<RefCell<LinkButton>> = new_game_rc.clone();
+        let keyboard_row_1_rc_2: Rc<RefCell<Box>> = keyboard_row_1_rc.clone();
+        let keyboard_row_2_rc_2: Rc<RefCell<Box>> = keyboard_row_2_rc.clone();
+        let keyboard_row_3_rc_2: Rc<RefCell<Box>> = keyboard_row_3_rc.clone();
+        let letter_states_rc_2: Rc<RefCell<HashMap<char, usize>>> = letter_states_rc.clone();
+        let window_rc_2: Rc<RefCell<ApplicationWindow>> = window_rc.clone();
+        let cur_x_rc_2: Rc<RefCell<usize>> = cur_x_rc.clone();
+        let board_chars_rc_2: Rc<RefCell<[[char; WORD_LENGTH]; MAX_GUESSES]>> =
+            board_chars_rc.clone();
+        let board_colors_rc_2: Rc<RefCell<[[usize; WORD_LENGTH]; MAX_GUESSES]>> =
+            board_colors_rc.clone();
+        let guess_rc_2: Rc<RefCell<usize>> = guess_rc.clone();
+        let locked_rc_2: Rc<RefCell<bool>> = locked_rc.clone();
+        let answer_rc_2: Rc<RefCell<String>> = answer_rc.clone();
+
+        let answer_index_rc: Rc<RefCell<usize>> = Rc::new(RefCell::new(answer_index));
+
+        //#endregion
+
+        update_board(board_chars, board_colors, guess, cur_x, grid_rc.borrow());
+
+        new_game.connect_activate_link(move |_| {
+            let new_game_val: Ref<LinkButton> = new_game_rc_2.borrow();
+            let mut locked_val: RefMut<bool> = locked_rc_2.borrow_mut();
+            let mut cur_x_val: RefMut<usize> = cur_x_rc_2.borrow_mut();
+            let mut board_chars_val: RefMut<[[char; WORD_LENGTH]; MAX_GUESSES]> =
+                board_chars_rc_2.borrow_mut();
+            let mut board_colors_val: RefMut<[[usize; WORD_LENGTH]; MAX_GUESSES]> =
+                board_colors_rc_2.borrow_mut();
+            let mut guess_val: RefMut<usize> = guess_rc_2.borrow_mut();
+            let mut letter_states_val: RefMut<HashMap<char, usize>> =
+                letter_states_rc_2.borrow_mut();
+            let grid_val: Ref<Grid> = grid_rc_2.borrow();
+            let keyboard_row_1_val: Ref<Box> = keyboard_row_1_rc_2.borrow();
+            let keyboard_row_2_val: Ref<Box> = keyboard_row_2_rc_2.borrow();
+            let keyboard_row_3_val: Ref<Box> = keyboard_row_3_rc_2.borrow();
+            let window_val: Ref<ApplicationWindow> = window_rc_2.borrow();
+            let mut answer_index_val: RefMut<usize> = answer_index_rc.borrow_mut();
+            let mut answer_val: RefMut<String> = answer_rc.borrow_mut();
+            let answers_val: Ref<Vec<String>> = answers_rc.borrow();
+            new_game_val.set_visible(false);
+            for i in 0..MAX_GUESSES {
+                for j in 0..WORD_LENGTH {
+                    board_chars_val[i][j] = ' ';
+                    board_colors_val[i][j] = COLOR_UNSET;
+                }
+            }
+            for c in LOWERCASE.chars() {
+                letter_states_val.insert(c, COLOR_UNSET);
+            }
+
+            update_board(
+                *board_chars_val,
+                *board_colors_val,
+                *guess_val,
+                *cur_x_val,
+                grid_val,
+            );
+            update_keyboard(
+                letter_states_val.clone(),
+                keyboard_row_1_val.clone(),
+                keyboard_row_2_val.clone(),
+                keyboard_row_3_val.clone(),
+            );
+
+            window_val.grab_focus();
+
+            *locked_val = false;
+            *cur_x_val = 0;
+            *guess_val = 0;
+
+            *answer_index_val = thread_rng().gen_range(0..answers_val.len());
+            *answer_val = answers_val[*answer_index_val].clone();
+
+            return Propagation::Stop;
+        });
 
         let k: EventControllerKey = EventControllerKey::builder().build();
         k.connect_key_pressed(move |_, k: Key, _, _| {
-            let mut cur_x_val: RefMut<usize> = cur_x.borrow_mut();
+            let mut cur_x_val: RefMut<usize> = cur_x_rc.borrow_mut();
             let mut board_chars_val: RefMut<[[char; WORD_LENGTH]; MAX_GUESSES]> =
-                board_chars.borrow_mut();
+                board_chars_rc.borrow_mut();
             let mut board_colors_val: RefMut<[[usize; WORD_LENGTH]; MAX_GUESSES]> =
-                board_colors.borrow_mut();
-            let grid_val: Ref<Grid> = grid.borrow();
-            let keyboard_row_1_val = keyboard_row_1.borrow();
-            let keyboard_row_2_val = keyboard_row_2.borrow();
-            let keyboard_row_3_val = keyboard_row_3.borrow();
-            let window_val = window_rc.borrow();
-            let mut guess_val: RefMut<usize> = guess.borrow_mut();
-            let mut letter_states_val: RefMut<HashMap<char, usize>> = letter_states.borrow_mut();
-            let mut locked_val: RefMut<bool> = locked.borrow_mut();
+                board_colors_rc.borrow_mut();
+            let grid_val: Ref<Grid> = grid_rc.borrow();
+            let new_game_val: Ref<LinkButton> = new_game_rc.borrow();
+            let keyboard_row_1_val: Ref<Box> = keyboard_row_1_rc.borrow();
+            let keyboard_row_2_val: Ref<Box> = keyboard_row_2_rc.borrow();
+            let keyboard_row_3_val: Ref<Box> = keyboard_row_3_rc.borrow();
+            let window_val: Ref<ApplicationWindow> = window_rc.borrow();
+            let mut guess_val: RefMut<usize> = guess_rc.borrow_mut();
+            let mut letter_states_val: RefMut<HashMap<char, usize>> = letter_states_rc.borrow_mut();
+            let mut locked_val: RefMut<bool> = locked_rc.borrow_mut();
+            let answer_val: Ref<String> = answer_rc_2.borrow();
 
             if *locked_val {
                 return Propagation::Proceed;
@@ -342,12 +440,11 @@ fn main() -> glib::ExitCode {
                     if words.contains(&guess_str) {
                         let winner: bool = get_guess_status(
                             board_chars_val[*guess_val],
-                            answer.as_str(),
+                            answer_val.as_str(),
                             &mut board_colors_val[*guess_val],
                             &mut *letter_states_val,
                         );
                         if winner {
-                            // TODO: win
                             update_board(
                                 *board_chars_val,
                                 *board_colors_val,
@@ -362,13 +459,15 @@ fn main() -> glib::ExitCode {
                                 keyboard_row_3_val.clone(),
                             );
                             *locked_val = true;
+                            new_game_val.set_visible(true);
+                            let message: String = format!("Guessed in {} tries", *guess_val + 1);
                             AlertDialog::builder()
-                                .detail("You Win!")
+                                .message("You Win!")
+                                .detail(message)
                                 .build()
                                 .show(Some(&*window_val));
                             return Propagation::Stop;
                         } else if *guess_val == MAX_GUESSES - 1 {
-                            // TODO: fail
                             update_board(
                                 *board_chars_val,
                                 *board_colors_val,
@@ -382,13 +481,14 @@ fn main() -> glib::ExitCode {
                                 keyboard_row_2_val.clone(),
                                 keyboard_row_3_val.clone(),
                             );
-                            let message = format!("The word was \"{}\"", answer);
+                            let message: String = format!("The word was \"{}\"", *answer_val);
                             AlertDialog::builder()
                                 .detail(message)
                                 .message("You Lose!")
                                 .build()
                                 .show(Some(&*window_val));
                             *locked_val = true;
+                            new_game_val.set_visible(true);
                             return Propagation::Stop;
                         }
                         *guess_val += 1;
@@ -411,7 +511,6 @@ fn main() -> glib::ExitCode {
                 return Propagation::Stop;
             } else {
                 if *cur_x_val + 1 <= WORD_LENGTH {
-                    // Is this a crime? Yeah, probably. Am I going to fix it? Probably not.
                     let unicode: Option<char> = k.to_unicode();
                     if unicode.is_some() {
                         let mut chr: String = String::from(unicode.unwrap());
