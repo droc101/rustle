@@ -22,3 +22,6 @@
 .gray {
     background: gray;
 }
+#keyboard {
+    border-color: #ccc2;
+}

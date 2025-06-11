@@ -1,11 +1,15 @@
 use gtk::prelude::*;
-use gtk::{glib, Application, ApplicationWindow};
 use gtk4 as gtk;
 use gtk4::gdk::Key;
-use gtk4::glib::Propagation;
+use gtk4::glib::{ExitCode, Propagation};
 use gtk4::Orientation::{Horizontal, Vertical};
 use gtk4::{
-    gdk, AlertDialog, Align, Box, CssProvider, EventControllerKey, Grid, Label, LinkButton, Widget,
+    gdk, AlertDialog, Align, Box, CssProvider, EventControllerKey,
+    Grid, Label, LinkButton, Widget,
+};
+use libadwaita::prelude::{AdwApplicationWindowExt, BinExt};
+use libadwaita::{
+    Application, ApplicationWindow, Bin, HeaderBar, Toast, ToastOverlay, ToastPriority,
 };
 use rand::{rng, Rng};
 use std::cell::{Ref, RefCell, RefMut};
@@ -172,10 +176,10 @@ fn build_keyboard_row(keys: &str) -> Box {
     return keyboard_row;
 }
 
-fn main() -> glib::ExitCode {
+fn main() -> ExitCode {
     if !std::fs::exists("words.txt").expect("Failed to check if file exists") {
         println!("words.txt not found!");
-        return glib::ExitCode::FAILURE;
+        return ExitCode::FAILURE;
     }
 
     let app: Application = Application::builder()
@@ -233,21 +237,28 @@ fn main() -> glib::ExitCode {
         let window: ApplicationWindow = ApplicationWindow::builder()
             .application(app)
             .default_width(800)
-            .default_height(750)
+            .default_height(810)
             .title("Rustle!")
             .resizable(false)
             .build();
 
+        let outermost_box = Box::new(Vertical, 0);
+
+        let header: HeaderBar = HeaderBar::builder().show_start_title_buttons(true).build();
+        outermost_box.append(&header);
+
         let outer_box: Box = Box::new(Horizontal, 6);
+        outer_box.set_hexpand(false);
         outer_box.set_halign(Align::Center);
 
         let main_box: Box = Box::new(Vertical, 6);
         main_box.set_vexpand(true);
+        main_box.set_hexpand(false);
         main_box.set_margin_top(10);
 
         let title: Label = Label::builder().build();
         title.set_text("Rustle!");
-        title.add_css_class("title");
+        title.add_css_class("title_text");
         title.set_margin_bottom(10);
         main_box.append(&title);
 
@@ -278,23 +289,34 @@ fn main() -> glib::ExitCode {
         grid_box.append(&grid);
         main_box.append(&grid_box);
 
+        let focusable_box = Bin::builder().build();
+        focusable_box.set_margin_top(50);
+        focusable_box.set_widget_name("keyboard");
+        main_box.append(&focusable_box);
+
+        let kb_box: Box = Box::new(Vertical, 8);
+
         let keyboard_row_1: Box = build_keyboard_row(KEYBOARD_ROW1);
-        keyboard_row_1.set_margin_top(50);
-        main_box.append(&keyboard_row_1);
+        kb_box.append(&keyboard_row_1);
 
         let keyboard_row_2: Box = build_keyboard_row(KEYBOARD_ROW2);
-        main_box.append(&keyboard_row_2);
+        kb_box.append(&keyboard_row_2);
 
         let keyboard_row_3: Box = build_keyboard_row(KEYBOARD_ROW3);
-        main_box.append(&keyboard_row_3);
+        kb_box.append(&keyboard_row_3);
 
-        let new_game: LinkButton = LinkButton::builder().label("New Game").build();
+        focusable_box.set_child(Some(&kb_box));
+
+        let new_game: LinkButton = LinkButton::builder().label("Play Again").build();
         new_game.add_css_class("new_game");
         new_game.set_visible(false);
         main_box.append(&new_game);
 
-        outer_box.append(&main_box);
-        window.set_child(Some(&outer_box));
+        let toast_overlay: ToastOverlay = ToastOverlay::new();
+        toast_overlay.set_child(Some(&outermost_box));
+
+        outermost_box.append(&main_box);
+        window.set_content(Some(&toast_overlay));
 
         //#region refcells
         let grid_rc: Rc<RefCell<Grid>> = Rc::new(RefCell::new(grid.clone()));
@@ -314,6 +336,7 @@ fn main() -> glib::ExitCode {
         let locked_rc: Rc<RefCell<bool>> = Rc::new(RefCell::new(locked));
         let answer_rc: Rc<RefCell<String>> = Rc::new(RefCell::new(answer));
         let answers_rc: Rc<RefCell<Vec<String>>> = Rc::new(RefCell::new(answers));
+        let toast_overlay_rc: Rc<RefCell<ToastOverlay>> = Rc::new(RefCell::new(toast_overlay));
 
         let grid_rc_2: Rc<RefCell<Grid>> = grid_rc.clone();
         let new_game_rc_2: Rc<RefCell<LinkButton>> = new_game_rc.clone();
@@ -410,6 +433,7 @@ fn main() -> glib::ExitCode {
             let mut letter_states_val: RefMut<HashMap<char, usize>> = letter_states_rc.borrow_mut();
             let mut locked_val: RefMut<bool> = locked_rc.borrow_mut();
             let answer_val: Ref<String> = answer_rc_2.borrow();
+            let toast_overlay_val: Ref<ToastOverlay> = toast_overlay_rc.borrow();
 
             if *locked_val {
                 return Propagation::Proceed;
@@ -506,7 +530,19 @@ fn main() -> glib::ExitCode {
                             keyboard_row_2_val.clone(),
                             keyboard_row_3_val.clone(),
                         );
+                    } else {
+                        toast_overlay_val.dismiss_all();
+                        let toast: Toast = Toast::new("Invalid Word!");
+                        toast.set_timeout(2);
+                        toast.set_priority(ToastPriority::High);
+                        toast_overlay_val.add_toast(toast);
                     }
+                } else {
+                    toast_overlay_val.dismiss_all();
+                    let toast: Toast = Toast::new("Not enough letters!");
+                    toast.set_timeout(2);
+                    toast.set_priority(ToastPriority::High);
+                    toast_overlay_val.add_toast(toast);
                 }
                 return Propagation::Stop;
             } else {

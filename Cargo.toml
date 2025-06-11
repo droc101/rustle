@@ -6,3 +6,4 @@ edition = "2024"
 [dependencies]
 rand = "0.9.1"
 gtk4 = { version = "0.9.6", features = ["v4_12"] }
+libadwaita = { version = "0.7.2", features = ["v1_7"] }

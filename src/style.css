@@ -1,4 +1,4 @@
-.title {
+.title_text {
     font-weight: bold;
     text-decoration: underline;
     font-size: 24pt;
@@ -39,4 +39,14 @@
 
 .new_game {
     font-size: 14px;
+}
+
+#keyboard {
+    background: var(--card-bg-color);
+    border: 1px solid #5552;
+    box-sizing: border-box;
+    border-radius: 0;
+    padding: 8px;
+    border-left: none;
+    border-right: none;
 }
