@@ -12,6 +12,15 @@
     color: white;
 }
 
+.key {
+    border: 1px solid #5558;
+    border-radius: 8px;
+    font-size: 14pt;
+    font-weight: bold;
+    color: white;
+    border-bottom-width: 4px;
+}
+
 .cursor {
     border: 1px solid #fff8;
 }
@@ -27,12 +36,4 @@
 
 .gray {
     background: gray;
-}
-
-.key {
-    border: 1px solid #5558;
-    border-radius: 8px;
-    font-size: 14pt;
-    font-weight: bold;
-    color: white;
 }

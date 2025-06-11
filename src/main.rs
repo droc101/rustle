@@ -35,7 +35,7 @@ fn get_guess_status(
     guess: [char; WORD_LENGTH],
     target_slice: &str,
     output: &mut [usize; WORD_LENGTH],
-    // grays: &mut Vec<char>
+    letter_states: &mut HashMap<char, usize>, // grays: &mut Vec<char>
 ) -> bool {
     let target: String = target_slice.chars().collect();
     let lowercase_letters: String = String::from(LOWERCASE);
@@ -54,6 +54,7 @@ fn get_guess_status(
             output[i] = COLOR_GREEN;
             wins += 1;
             *green_count_map.get_mut(&c).unwrap() += 1;
+            letter_states.insert(c, COLOR_GREEN);
         }
     }
     for i in 0..WORD_LENGTH {
@@ -62,11 +63,12 @@ fn get_guess_status(
             if green_count_map[&c] + yellow_count_map[&c] < total_count_map[&c] {
                 output[i] = COLOR_YELLOW;
                 *yellow_count_map.get_mut(&c).unwrap() += 1;
+                letter_states.insert(c, COLOR_YELLOW);
             } else {
                 output[i] = COLOR_GRAY;
-                // if !grays.contains(&c) && !target.contains(c) {
-                //     grays.push(c);
-                // }
+                if !target.contains(c) {
+                    letter_states.insert(c, COLOR_GRAY);
+                }
             }
         }
     }
@@ -103,6 +105,49 @@ fn update_board(
             l.set_text(&*c.to_string().to_uppercase());
         }
     }
+}
+
+fn update_keyboard_row(
+    letter_states: HashMap<char, usize>,
+    keyboard_row: Box,
+    chars: &str,
+) {
+    let mut child = keyboard_row.first_child().expect("Keyboard key missing!");
+
+    for c in chars.chars() {
+        if let Ok(l) = child.clone().downcast::<gtk4::Label>() {
+            if let Some(color) = letter_states.get(&c) {
+                l.remove_css_class("green");
+                l.remove_css_class("yellow");
+                l.remove_css_class("gray");
+                l.remove_css_class("cursor");
+                if *color == COLOR_GREEN {
+                    l.add_css_class("green");
+                } else if *color == COLOR_YELLOW {
+                    l.add_css_class("yellow");
+                } else if *color == COLOR_GRAY {
+                    l.add_css_class("gray");
+                }
+            }
+        }
+        let next_child = child.next_sibling();
+        if next_child.is_some() {
+            child = next_child.unwrap();
+        } else {
+            break;
+        }
+    }
+}
+
+fn update_keyboard(
+    letter_states: HashMap<char, usize>,
+    keyboard_row1: Box,
+    keyboard_row2: Box,
+    keyboard_row3: Box,
+) {
+    update_keyboard_row(letter_states.clone(), keyboard_row1, KEYBOARD_ROW1);
+    update_keyboard_row(letter_states.clone(), keyboard_row2, KEYBOARD_ROW2);
+    update_keyboard_row(letter_states.clone(), keyboard_row3, KEYBOARD_ROW3);
 }
 
 fn build_keyboard_row(keys: &str) -> Box {
@@ -154,10 +199,15 @@ fn main() -> glib::ExitCode {
         let board_chars: [[char; WORD_LENGTH]; MAX_GUESSES] = [[' '; WORD_LENGTH]; MAX_GUESSES];
         let board_colors: [[usize; WORD_LENGTH]; MAX_GUESSES] =
             [[COLOR_UNSET; WORD_LENGTH]; MAX_GUESSES];
+        let mut letter_states: HashMap<char, usize> = HashMap::new();
         let cur_x: usize = 0;
         let guess: usize = 0;
         let answer_index: usize = thread_rng().gen_range(0..answers.len());
         let answer: String = words[answer_index].clone();
+
+        for c in LOWERCASE.chars() {
+            letter_states.insert(c, COLOR_UNSET);
+        }
 
         let window: ApplicationWindow = ApplicationWindow::builder()
             .application(app)
@@ -207,22 +257,32 @@ fn main() -> glib::ExitCode {
         grid_box.append(&grid);
         main_box.append(&grid_box);
 
-        // let keyboard_row_1: Box = build_keyboard_row(KEYBOARD_ROW1);
-        // keyboard_row_1.set_margin_top(50);
-        // main_box.append(&keyboard_row_1);
-        // 
-        // let keyboard_row_2: Box = build_keyboard_row(KEYBOARD_ROW2);
-        // main_box.append(&keyboard_row_2);
-        // 
-        // let keyboard_row_3: Box = build_keyboard_row(KEYBOARD_ROW3);
-        // main_box.append(&keyboard_row_3);
+        let keyboard_row_1: Box = build_keyboard_row(KEYBOARD_ROW1);
+        keyboard_row_1.set_margin_top(50);
+        main_box.append(&keyboard_row_1);
+
+        let keyboard_row_2: Box = build_keyboard_row(KEYBOARD_ROW2);
+        main_box.append(&keyboard_row_2);
+
+        let keyboard_row_3: Box = build_keyboard_row(KEYBOARD_ROW3);
+        main_box.append(&keyboard_row_3);
 
         outer_box.append(&main_box);
         window.set_child(Some(&outer_box));
 
         let grid: Rc<RefCell<Grid>> = Rc::new(RefCell::new(grid));
+        let keyboard_row_1: Rc<RefCell<Box>> = Rc::new(RefCell::new(keyboard_row_1));
+        let keyboard_row_2: Rc<RefCell<Box>> = Rc::new(RefCell::new(keyboard_row_2));
+        let keyboard_row_3: Rc<RefCell<Box>> = Rc::new(RefCell::new(keyboard_row_3));
+        let letter_states: Rc<RefCell<HashMap<char, usize>>> = Rc::new(RefCell::new(letter_states));
 
         update_board(board_chars, board_colors, guess, cur_x, grid.borrow());
+        // update_keyboard(
+        //     letter_states.borrow(),
+        //     *keyboard_row_1.borrow(),
+        //     keyboard_row_2,
+        //     keyboard_row_3,
+        // );
 
         let cur_x: Rc<RefCell<usize>> = Rc::new(RefCell::new(cur_x));
         let board_chars: Rc<RefCell<[[char; WORD_LENGTH]; MAX_GUESSES]>> =
@@ -230,6 +290,7 @@ fn main() -> glib::ExitCode {
         let board_colors: Rc<RefCell<[[usize; WORD_LENGTH]; MAX_GUESSES]>> =
             Rc::new(RefCell::new(board_colors));
         let guess: Rc<RefCell<usize>> = Rc::new(RefCell::new(guess)); // assuming guess is Copy or Clone
+        
 
         let k: EventControllerKey = EventControllerKey::builder().build();
         k.connect_key_pressed(move |_, k: Key, _, _| {
@@ -239,7 +300,11 @@ fn main() -> glib::ExitCode {
             let mut board_colors_val: RefMut<[[usize; WORD_LENGTH]; MAX_GUESSES]> =
                 board_colors.borrow_mut();
             let grid_val: Ref<Grid> = grid.borrow();
+            let keyboard_row_1_val = keyboard_row_1.borrow();
+            let keyboard_row_2_val = keyboard_row_2.borrow();
+            let keyboard_row_3_val = keyboard_row_3.borrow();
             let mut guess_val: RefMut<usize> = guess.borrow_mut();
+            let mut letter_states_val: RefMut<HashMap<char, usize>> = letter_states.borrow_mut();
             if k == Key::BackSpace {
                 if *cur_x_val != 0 {
                     board_chars_val[*guess_val][*cur_x_val - 1] = ' ';
@@ -252,6 +317,12 @@ fn main() -> glib::ExitCode {
                     *cur_x_val,
                     grid_val,
                 );
+                update_keyboard(
+                    letter_states_val.clone(),
+                    keyboard_row_1_val.clone(),
+                    keyboard_row_2_val.clone(),
+                    keyboard_row_3_val.clone(),
+                );
                 return Propagation::Stop;
             } else if k == Key::Return || k == Key::KP_Enter {
                 if *cur_x_val == WORD_LENGTH {
@@ -261,6 +332,7 @@ fn main() -> glib::ExitCode {
                             board_chars_val[*guess_val],
                             answer.as_str(),
                             &mut board_colors_val[*guess_val],
+                            &mut *letter_states_val,
                         );
                         if winner {
                             // TODO: win
@@ -270,6 +342,12 @@ fn main() -> glib::ExitCode {
                                 *guess_val,
                                 *cur_x_val,
                                 grid_val,
+                            );
+                            update_keyboard(
+                                letter_states_val.clone(),
+                                keyboard_row_1_val.clone(),
+                                keyboard_row_2_val.clone(),
+                                keyboard_row_3_val.clone(),
                             );
                             return Propagation::Stop;
                         } else if *guess_val == MAX_GUESSES - 1 {
@@ -281,6 +359,12 @@ fn main() -> glib::ExitCode {
                                 *cur_x_val,
                                 grid_val,
                             );
+                            update_keyboard(
+                                letter_states_val.clone(),
+                                keyboard_row_1_val.clone(),
+                                keyboard_row_2_val.clone(),
+                                keyboard_row_3_val.clone(),
+                            );
                             return Propagation::Stop;
                         }
                         *guess_val += 1;
@@ -291,6 +375,12 @@ fn main() -> glib::ExitCode {
                             *guess_val,
                             *cur_x_val,
                             grid_val,
+                        );
+                        update_keyboard(
+                            letter_states_val.clone(),
+                            keyboard_row_1_val.clone(),
+                            keyboard_row_2_val.clone(),
+                            keyboard_row_3_val.clone(),
                         );
                     }
                 }
@@ -311,6 +401,12 @@ fn main() -> glib::ExitCode {
                                 *guess_val,
                                 *cur_x_val,
                                 grid_val,
+                            );
+                            update_keyboard(
+                                letter_states_val.clone(),
+                                keyboard_row_1_val.clone(),
+                                keyboard_row_2_val.clone(),
+                                keyboard_row_3_val.clone(),
                             );
                             return Propagation::Stop;
                         }
