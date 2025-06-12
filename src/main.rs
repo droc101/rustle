@@ -4,7 +4,8 @@ use gtk4::gdk::Key;
 use gtk4::glib::{ExitCode, Propagation};
 use gtk4::Orientation::{Horizontal, Vertical};
 use gtk4::{
-    gdk, AlertDialog, Align, Box, Button, CssProvider, EventControllerKey, Grid, Label, Widget,
+    gdk, AlertDialog, Align, Box, Button, CssProvider, EventControllerKey, Grid, Label,
+    Settings, Widget,
 };
 use libadwaita::prelude::{AdwApplicationWindowExt, BinExt};
 use libadwaita::{
@@ -140,7 +141,7 @@ fn update_keyboard_row(letter_states: HashMap<char, usize>, keyboard_row: Box, c
                 }
             }
         }
-        let next_child = child.next_sibling();
+        let next_child: Option<Widget> = child.next_sibling();
         if next_child.is_some() {
             child = next_child.unwrap();
         } else {
@@ -176,12 +177,12 @@ fn build_keyboard_row(keys: &str) -> Box {
 }
 
 fn main() -> ExitCode {
-    if !std::fs::exists("words.txt").expect("Failed to check if file exists") {
-        println!("words.txt not found!");
+    if !std::fs::exists("assets/lists/words.txt").expect("Failed to check if file exists") {
+        println!("words list not found!");
         return ExitCode::FAILURE;
     }
-    if !std::fs::exists("answers.txt").expect("Failed to check if file exists") {
-        println!("answers.txt not found!");
+    if !std::fs::exists("assets/lists/answers.txt").expect("Failed to check if file exists") {
+        println!("answer list not found!");
         return ExitCode::FAILURE;
     }
 
@@ -189,9 +190,9 @@ fn main() -> ExitCode {
         .application_id("dev.droc101.rustle")
         .build();
 
-    app.connect_startup(|_app| {
+    app.connect_startup(|_| {
         let provider: CssProvider = CssProvider::new();
-        provider.load_from_string(include_str!("style.css"));
+        provider.load_from_string(include_str!("../assets/style/style.css"));
 
         gtk::style_context_add_provider_for_display(
             &gdk::Display::default().expect("Could not connect to a display."),
@@ -199,10 +200,10 @@ fn main() -> ExitCode {
             gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
         );
 
-        let settings = gtk::Settings::default().unwrap();
+        let settings: Settings = Settings::default().unwrap();
         if settings.is_gtk_application_prefer_dark_theme() {
-            let dark_provider = CssProvider::new();
-            dark_provider.load_from_string(include_str!("style.dark.css"));
+            let dark_provider: CssProvider = CssProvider::new();
+            dark_provider.load_from_string(include_str!("../assets/style/style.dark.css"));
             gtk::style_context_add_provider_for_display(
                 &gdk::Display::default().expect("Could not connect to a display."),
                 &dark_provider,
@@ -211,14 +212,14 @@ fn main() -> ExitCode {
         }
     });
 
-    app.connect_activate(|app| {
+    app.connect_activate(|app: &Application| -> () {
         let lowercase_letters: String = String::from(LOWERCASE);
-        let words: Vec<String> = read_to_string("words.txt")
+        let words: Vec<String> = read_to_string("assets/lists/words.txt")
             .unwrap()
             .lines()
             .map(String::from)
             .collect();
-        let answers: Vec<String> = read_to_string("answers.txt")
+        let answers: Vec<String> = read_to_string("assets/lists/answers.txt")
             .unwrap()
             .lines()
             .map(String::from)
@@ -245,7 +246,7 @@ fn main() -> ExitCode {
             .resizable(false)
             .build();
 
-        let outermost_box = Box::new(Vertical, 0);
+        let outermost_box: Box = Box::new(Vertical, 0);
 
         let header: HeaderBar = HeaderBar::builder().show_start_title_buttons(true).build();
         outermost_box.append(&header);
@@ -292,10 +293,10 @@ fn main() -> ExitCode {
         grid_box.append(&grid);
         main_box.append(&grid_box);
 
-        let focusable_box = Bin::builder().build();
-        focusable_box.set_margin_top(40);
-        focusable_box.set_widget_name("keyboard");
-        main_box.append(&focusable_box);
+        let keyboard_bin: Bin = Bin::builder().build();
+        keyboard_bin.set_margin_top(40);
+        keyboard_bin.set_widget_name("keyboard");
+        main_box.append(&keyboard_bin);
 
         let kb_box: Box = Box::new(Vertical, 8);
 
@@ -308,7 +309,7 @@ fn main() -> ExitCode {
         let keyboard_row_3: Box = build_keyboard_row(KEYBOARD_ROW3);
         kb_box.append(&keyboard_row_3);
 
-        focusable_box.set_child(Some(&kb_box));
+        keyboard_bin.set_child(Some(&kb_box));
 
         let new_game: Button = Button::builder().label("Play Again").build();
         new_game.add_css_class("new_game");
