@@ -44,7 +44,6 @@
 #keyboard {
     background: var(--card-bg-color);
     border: 1px solid #5552;
-    box-sizing: border-box;
     border-radius: 8px;
     padding: 8px;
 }

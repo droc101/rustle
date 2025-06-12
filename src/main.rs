@@ -22,7 +22,7 @@ const COLOR_UNSET: usize = 0;
 const COLOR_GRAY: usize = 1;
 /// The color for a letter that is in the word, but not at that position
 const COLOR_YELLOW: usize = 2;
-// The color for a letter that is in the word at that position
+/// The color for a letter that is in the word at that position
 const COLOR_GREEN: usize = 3;
 
 /// The length of the word / width of the board
@@ -94,7 +94,7 @@ fn update_board(
     cur_row: usize,
     cur_col: usize,
     grid_ref: Ref<Grid>,
-) {
+) -> () {
     for row in 0..MAX_GUESSES {
         for chr in 0..WORD_LENGTH {
             let mut c: char = board_chars[row][chr];
@@ -121,7 +121,7 @@ fn update_board(
 }
 
 /// Update the colors on a row of the keyboard
-fn update_keyboard_row(letter_states: HashMap<char, usize>, keyboard_row: Box, chars: &str) {
+fn update_keyboard_row(letter_states: HashMap<char, usize>, keyboard_row: Box, chars: &str) -> () {
     let mut child = keyboard_row.first_child().expect("Keyboard key missing!");
 
     for c in chars.chars() {
@@ -155,7 +155,7 @@ fn update_keyboard(
     keyboard_row1: Box,
     keyboard_row2: Box,
     keyboard_row3: Box,
-) {
+) -> () {
     update_keyboard_row(letter_states.clone(), keyboard_row1, KEYBOARD_ROW1);
     update_keyboard_row(letter_states.clone(), keyboard_row2, KEYBOARD_ROW2);
     update_keyboard_row(letter_states.clone(), keyboard_row3, KEYBOARD_ROW3);
