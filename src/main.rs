@@ -180,6 +180,10 @@ fn main() -> ExitCode {
         println!("words.txt not found!");
         return ExitCode::FAILURE;
     }
+    if !std::fs::exists("answers.txt").expect("Failed to check if file exists") {
+        println!("answers.txt not found!");
+        return ExitCode::FAILURE;
+    }
 
     let app: Application = Application::builder()
         .application_id("dev.droc101.rustle")
